@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>시간 측정 페이지</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.4/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.0/FileSaver.min.js"></script>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            font-family: 'Arial', sans-serif;
+        }
+
+        #timer {
+            font-size: calc(min(100vw, 100vh) / 10);
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        #buttonContainer {
+            position: absolute;
+            top: calc(50% + min(100vw, 100vh) / 16 + 20px);
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 10px;
+        }
+
+        button {
+            font-size: calc(min(100vw, 100vh) / 20);
+            padding: 10px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+            background-color: #77dd77;
+            color: #fff;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        button:hover {
+            background-color: #5cb85c;
+        }
+    </style>
+</head>
+</head>
+
+<body>
+    <div id="timer">00:00</div>
+    <div id="buttonContainer">
+        <button id="startStopButton">시작</button>
+        <button id="resetButton">리셋</button>
+        <button id="saveButton">저장</button>
+    </div>
+
+    <script>
+        let time = 0;
+        let isRunning = false;
+        let interval;
+        const timerElement = document.getElementById('timer');
+        const startStopButton = document.getElementById('startStopButton');
+        const resetButton = document.getElementById('resetButton');
+        const saveButton = document.getElementById('saveButton');
+
+        // 타이머와 저장 기능은 유지됩니다.
+        function formatTime(seconds) {
+            const minutes = Math.floor(seconds / 60);
+            const remainingSeconds = seconds % 60;
+            const formattedTime =
+                (minutes < 10 ? '0' : '') + minutes + ':' +
+                (remainingSeconds < 10 ? '0' : '') + remainingSeconds;
+            return formattedTime;
+        }
+
+        function startTimer() {
+            interval = setInterval(() => {
+                time++;
+                const formattedTime = formatTime(time);
+                timerElement.textContent = formattedTime;
+            }, 1000);
+        }
+
+        function resetTimer() {
+            clearInterval(interval);
+            time = 0;
+            timerElement.textContent = '00:00';
+            isRunning = false;
+            startStopButton.textContent = '시작';
+        }
+
+        startStopButton.addEventListener('click', () => {
+            if (!isRunning) {
+                startTimer();
+                isRunning = true;
+                startStopButton.textContent = '멈춤';
+            } else {
+                clearInterval(interval);
+                isRunning = false;
+                startStopButton.textContent = '시작';
+            }
+        });
+
+        resetButton.addEventListener('click', () => {
+            resetTimer();
+        });
+
+
+        saveButton.addEventListener('click', () => {
+            const name = prompt('이름을 입력하세요:');
+            if (name !== null && name.trim() !== '') {
+                const formattedTime = formatTime(time);
+
+                // 서버로 데이터 전송 (Ajax 요청)
+                fetch('/save_data', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ Name: name, Time: formattedTime })
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            resetTimer(); // 저장 후 타이머 리셋
+                        } else {
+                            alert('데이터 저장에 실패했습니다.');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('데이터 저장 오류:', error);
+                        alert('데이터 저장에 오류가 발생했습니다.');
+                    });
+            }
+        });
+    </script>
+</body>
+
+</html>

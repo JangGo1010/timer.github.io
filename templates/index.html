@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>시간 측정 페이지</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.4/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.0/FileSaver.min.js"></script>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            font-family: 'Arial', sans-serif;
+        }
+
+        #timer {
+            font-size: calc(min(100vw, 100vh) / 10);
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        #buttonContainer {
+            position: absolute;
+            top: calc(50% + min(100vw, 100vh) / 16 + 20px);
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 10px;
+        }
+
+        button {
+            font-size: calc(min(100vw, 100vh) / 20);
+            padding: 10px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+            background-color: #77dd77;
+            color: #fff;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        button:hover {
+            background-color: #5cb85c;
+        }
+
+        #record-time {
+            position: fixed;
+            top: 0;
+            right: 0;
+            height: 100%;
+            width: 25%;
+            /* 화면의 1/4 크기 */
+            background-color: #f2f2f2;
+            overflow-y: auto;
+            /* 리스트가 길어질 경우 스크롤 가능하도록 설정 */
+            border-left: 1px solid #ccc;
+            padding: 20px;
+        }
+    </style>
+</head>
+</head>
+
+<body>
+    <div id="timer">00:00</div>
+    <div id="buttonContainer">
+        <button id="startStopButton">시작</button>
+        <button id="resetButton">리셋</button>
+        <button id="saveButton">저장</button>
+    </div>
+    <div id="record-time">
+        <div id="data-list"></div> <!-- CSV 데이터를 표시할 div -->
+    </div>
+    <script>
+        let time = 0;
+        let isRunning = false;
+        let interval;
+        const timerElement = document.getElementById('timer');
+        const startStopButton = document.getElementById('startStopButton');
+        const resetButton = document.getElementById('resetButton');
+        const saveButton = document.getElementById('saveButton');
+
+        // 타이머와 저장 기능은 유지됩니다.
+        function formatTime(seconds) {
+            const minutes = Math.floor(seconds / 60);
+            const remainingSeconds = seconds % 60;
+            const formattedTime =
+                (minutes < 10 ? '0' : '') + minutes + ':' +
+                (remainingSeconds < 10 ? '0' : '') + remainingSeconds;
+            return formattedTime;
+        }
+
+        function startTimer() {
+            interval = setInterval(() => {
+                time++;
+                const formattedTime = formatTime(time);
+                timerElement.textContent = formattedTime;
+            }, 1000);
+        }
+
+        function resetTimer() {
+            clearInterval(interval);
+            time = 0;
+            timerElement.textContent = '00:00';
+            isRunning = false;
+            startStopButton.textContent = '시작';
+        }
+
+        startStopButton.addEventListener('click', () => {
+            if (!isRunning) {
+                startTimer();
+                isRunning = true;
+                startStopButton.textContent = '멈춤';
+            } else {
+                clearInterval(interval);
+                isRunning = false;
+                startStopButton.textContent = '시작';
+            }
+        });
+
+        resetButton.addEventListener('click', () => {
+            resetTimer();
+        });
+
+
+        saveButton.addEventListener('click', () => {
+            const name = prompt('이름을 입력하세요:');
+            if (name !== null && name.trim() !== '') {
+                const formattedTime = formatTime(time);
+
+                // 서버로 데이터 전송 (Ajax 요청)
+                fetch('save_data', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ Name: name, Time: formattedTime })
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            resetTimer(); // 저장 후 타이머 리셋
+                        } else {
+                            alert('데이터 저장에 실패했습니다.');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('데이터 저장 오류:', error);
+                        alert('데이터 저장에 오류가 발생했습니다.');
+                    });
+            }
+        });
+
+        // CSV 파일을 불러와서 데이터 표시
+        function displayCSVData() {
+            fetch('\data.csv') // data.csv 파일을 가져옴 (파일 경로를 적절히 수정해야 함)
+                .then(response => response.text())
+                .then(csvData => {
+                    const rows = csvData.split('\n'); // CSV 데이터를 개행을 기준으로 분할하여 각 행을 배열로 변환
+
+                    // 데이터를 표시할 div 요소 가져오기
+                    const dataListDiv = document.getElementById('data-list');
+
+                    // 각 행 데이터를 리스트 형태로 표시
+                    const dataList = document.createElement('ul');
+                    dataList.style.listStyleType = 'none';
+                    dataList.style.padding = '0';
+
+                    rows.forEach(row => {
+                        const item = document.createElement('li');
+                        item.textContent = row.trim(); // 각 행의 데이터를 리스트 아이템으로 추가
+                        dataList.appendChild(item);
+                    });
+
+                    // 리스트를 #data-list div에 추가하여 화면에 표시
+                    dataListDiv.appendChild(dataList);
+                })
+                .catch(error => {
+                    console.error('데이터 불러오기 오류:', error);
+                    alert('데이터 불러오기에 오류가 발생했습니다.');
+                });
+        }
+
+        // 페이지 로드 후 CSV 데이터 표시 함수 호출
+        window.onload = function () {
+            displayCSVData();
+        };
+
+    </script>
+</body>
+
+</html>
